@@ -20,7 +20,7 @@ You are helping build SentinelOps — a self-healing ML inference platform on Ku
 - Chaos: Chaos Mesh
 
 ## Environment
-- Windows host, WSL2 Ubuntu 22.04 (all work happens in WSL2)
+- Windows host, WSL2 Ubuntu 24.04 LTS (all work happens in WSL2)
 - Docker Desktop with WSL2 backend, 11GB RAM / 8 CPUs allocated
 - Working dir: ~/sentinelops in WSL2 (never /mnt/c/)
 - Python 3.11 for all services

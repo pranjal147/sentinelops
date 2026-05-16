@@ -24,3 +24,28 @@ X hours
 
 ### Blockers
 None / [list]
+
+---
+
+## Day 1 — Local k3d Cluster via Terraform (2026-05-16)
+
+**Goal:** Reproducible local Kubernetes cluster provisioned by Terraform.
+
+### Completed
+- [ ] local-cluster Terraform module written (main.tf, variables.tf, outputs.tf, versions.tf, README.md)
+- [ ] envs/local environment configured (main.tf, versions.tf, backend.tf, README.md)
+- [ ] Makefile with up-local, down-local, reset-local, status-local, smoke-test-local targets
+- [ ] Smoke test script validates registry + cluster
+- [ ] `terraform fmt -check` passes
+- [ ] `terraform validate` passes
+- [ ] Cluster recreation cycle works 3 times without error
+- [ ] Day 1 verification script passes
+
+### Time spent
+X hours
+
+### Blockers
+None / [list]
+
+### Tomorrow
+Day 2: Foundation layer — MinIO + Postgres + Redpanda via Helm
