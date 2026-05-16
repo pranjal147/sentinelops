@@ -1,0 +1,42 @@
+# SentinelOps Project Rules
+
+## Project Identity
+You are helping build SentinelOps — a self-healing ML inference platform on Kubernetes with Claude-based remediation.
+
+## Stack
+- Infra: Terraform, k3d (local), AWS EKS (Phase 2)
+- ML: Kubeflow Pipelines (standalone), MLflow, LightGBM, DistilBERT
+- Serving: KServe, Istio, FastAPI transformer
+- Events: Redpanda (Kafka-compatible)
+- Observability: Prometheus, Grafana, Loki
+- Safety: OPA Rego policies
+- AI: Claude API with tool-use for remediation agent
+- GitOps: ArgoCD
+- Chaos: Chaos Mesh
+
+## Environment
+- Windows host, WSL2 Ubuntu 22.04 (all work happens in WSL2)
+- Docker Desktop with WSL2 backend, 11GB RAM / 8 CPUs allocated
+- Working dir: ~/sentinelops in WSL2 (never /mnt/c/)
+- Python 3.11 for all services
+
+## Coding Conventions
+- Terraform: modules in infra/terraform/modules/, environments in infra/terraform/envs/
+- Helm values: separate YAML files in infra/helm-values/, referenced from Terraform helm_release
+- Python: type hints required, structlog for logging, pytest for tests, ruff for linting
+- Dockerfiles: multi-stage builds, distroless/alpine base where possible
+- Naming: kebab-case for K8s resources, snake_case for Python, PascalCase for classes
+- Commit messages: conventional commits (feat:, fix:, chore:, docs:, refactor:)
+
+## Critical Rules
+- NEVER use /mnt/c/ paths in WSL2 — always use ~/ (Linux filesystem)
+- NEVER commit secrets, .env files, AWS credentials, or model artifacts
+- NEVER expose services without Istio in front (after Day 6)
+- ALWAYS wrap kubectl/kustomize commands in Terraform null_resource for IaC
+- ALWAYS test commands with --dry-run or terraform plan before apply
+- ALWAYS check pod status with `kubectl wait` after deploys, never assume readiness
+
+## Day-by-Day Discipline
+- Every day ends with a commit + push + daily-log entry in docs/daily-log.md
+- Phase 2 (AWS days): MANDATORY `terraform destroy` at end of every session
+- Resource budget: project must stay under $100 AWS spend total
