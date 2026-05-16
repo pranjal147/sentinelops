@@ -1,0 +1,32 @@
+# Force LF line endings for all text files (prevents CRLF issues in WSL2/Linux)
+* text=auto eol=lf
+
+# Shell scripts must always be LF
+*.sh text eol=lf
+
+# Terraform
+*.tf text eol=lf
+*.tfvars text eol=lf
+
+# Python
+*.py text eol=lf
+
+# YAML / JSON
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# Rego (OPA policies)
+*.rego text eol=lf
+
+# Binaries — no line ending conversion
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.gz binary
+*.zip binary
+*.tar binary
