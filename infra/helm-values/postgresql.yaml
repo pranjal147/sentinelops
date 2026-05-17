@@ -1,0 +1,38 @@
+# PostgreSQL Helm values — bitnami/postgresql
+# ⚠ DEV ONLY: password is overridden via Terraform set_sensitive block.
+# ⚠ KNOWN ISSUE: Currently running on bitnami/postgresql:latest (rolling tag).
+#    Bitnami announced deprecation of free tags in Aug 2025. Plan to migrate
+#    to bitnamilegacy/postgresql:16.4.0-debian-12-r10 on Day 3 (clean install).
+
+architecture: standalone
+
+auth:
+  postgresPassword: changeme
+  username: ""
+  password: ""
+  database: ""
+
+primary:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""  # use cluster default (local-path on k3d)
+
+  initdb:
+    scripts:
+      01_create_databases.sql: |
+        CREATE DATABASE mlflow ENCODING 'UTF8';
+        CREATE DATABASE kfp ENCODING 'UTF8';
+        CREATE DATABASE metadata ENCODING 'UTF8';
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Access via port-forward:
+# kubectl port-forward svc/postgresql 5432:5432 -n platform
+# psql -h localhost -U postgres -W

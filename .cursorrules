@@ -40,3 +40,16 @@ You are helping build SentinelOps — a self-healing ML inference platform on Ku
 - Every day ends with a commit + push + daily-log entry in docs/daily-log.md
 - Phase 2 (AWS days): MANDATORY `terraform destroy` at end of every session
 - Resource budget: project must stay under $100 AWS spend total
+
+## MLflow Sourcing (added Day 3)
+- DO NOT use community-charts/mlflow Helm chart for MLflow 3.7+ — it has
+  unresolved compatibility issues (chart hasn't caught up to MLflow 3.7's
+  security middleware + chart silently filters extraEnvVars for reserved names).
+- Use plain Kubernetes Deployment manifest at infra/manifests/mlflow/
+  applied via Terraform null_resource.
+- Use burakince/mlflow:2.1.1 image (bundles psycopg2 + boto3 — official
+  ghcr.io/mlflow/mlflow images do NOT).
+- If pinning a newer MLflow version: verify the image tag exists on Docker Hub
+  BEFORE writing it into the manifest (docker pull <image>:<tag>).
+- Schema migrations are forward-only: if database was migrated by MLflow X.Y,
+  you cannot downgrade to MLflow X.Y-1 without DROPping + recreating the database.

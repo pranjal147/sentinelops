@@ -1,0 +1,115 @@
+# MLflow tracking server — plain Kubernetes Deployment
+# (We don't use the community-charts Helm chart due to MLflow 3.7 compat issues.)
+# 
+# Image: burakince/mlflow:2.1.1 (includes psycopg2 + boto3 — official images don't)
+# Backend: postgresql.platform.svc.cluster.local (database: mlflow)
+# Artifacts: s3://mlflow-artifacts on MinIO via S3 protocol
+# 
+# Secrets are injected from K8s secrets (created by Terraform in Step 4).
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  namespace: mlops
+  labels:
+    app: mlflow
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/managed-by: terraform
+    project: sentinelops
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: http
+  selector:
+    app: mlflow
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: mlops
+  labels:
+    app: mlflow
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/managed-by: terraform
+    project: sentinelops
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Single replica, no rolling needed
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+        app.kubernetes.io/name: mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: burakince/mlflow:2.1.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            # ── Postgres backend ──
+            - name: MLFLOW_BACKEND_STORE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secrets
+                  key: backend-store-uri
+            # ── S3 (MinIO) artifact root ──
+            - name: MLFLOW_DEFAULT_ARTIFACT_ROOT
+              value: "s3://mlflow-artifacts/"
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: "http://minio.platform.svc.cluster.local:9000"
+            - name: MLFLOW_S3_IGNORE_TLS
+              value: "true"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secrets
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secrets
+                  key: aws-secret-access-key
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+          command:
+            - "mlflow"
+            - "server"
+            - "--host=0.0.0.0"
+            - "--port=5000"
+            - "--workers=2"
+            - "--gunicorn-opts=--log-level=info"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 5

@@ -1,0 +1,84 @@
+# MLflow Helm values — community-charts/mlflow
+# Chart version: 1.8.1
+# App version: 3.7.0
+#
+# IMPORTANT: Use burakince/mlflow because the official ghcr.io image
+# lacks psycopg2 (Postgres driver) and boto3 (S3 client).
+#
+# MLflow 3.7 added security middleware that:
+#  1. Rejects non-localhost connections by default (kills K8s probes).
+#  2. Is INCOMPATIBLE with --gunicorn-opts (the chart's default).
+#
+# Solutions: either disable middleware (--disable-security-middleware) OR
+# switch to uvicorn (--uvicorn-opts). We choose to disable for dev simplicity.
+# Production should re-enable middleware and use uvicorn + Istio mTLS.
+#
+# DEV ONLY: passwords are wired via Terraform set_sensitive blocks.
+
+replicaCount: 1
+
+image:
+  repository: burakince/mlflow
+  tag: 3.7.0
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+backendStore:
+  postgres:
+    enabled: true
+    host: postgresql.platform.svc.cluster.local
+    port: 5432
+    database: mlflow
+    user: postgres
+  databaseConnectionCheck: true
+  databaseMigration: true
+
+artifactRoot:
+  s3:
+    enabled: true
+    bucket: mlflow-artifacts
+    path: ""
+    awsAccessKeyId: minio
+
+# extraFlags is a LIST of boolean CLI flags (no values).
+# disableSecurityMiddleware -> --disable-security-middleware
+extraFlags:
+  - disableSecurityMiddleware
+
+# extraArgs is a MAP of key:value CLI flags.
+# (Removed allowedHosts/corsAllowedOrigins — incompatible with gunicorn.)
+extraArgs: {}
+
+extraEnvVars:
+  MLFLOW_S3_ENDPOINT_URL: "http://minio.platform.svc.cluster.local:9000"
+  MLFLOW_S3_IGNORE_TLS: "true"
+  AWS_DEFAULT_REGION: "us-east-1"
+
+auth:
+  enabled: false
+
+serviceMonitor:
+  enabled: false
+
+livenessProbe:
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 10
+
+readinessProbe:
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 10

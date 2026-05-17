@@ -1,0 +1,66 @@
+# Official MinIO Helm chart values
+# Repo: https://charts.min.io/
+# Chart version: 5.4.0
+# App version: RELEASE.2024-12-18T13-15-44Z
+# NOT Bitnami — different schema!
+
+mode: standalone
+
+image:
+  repository: quay.io/minio/minio
+  tag: RELEASE.2024-12-18T13-15-44Z
+  pullPolicy: IfNotPresent
+
+mcImage:
+  repository: quay.io/minio/mc
+  tag: RELEASE.2024-11-21T17-21-54Z
+  pullPolicy: IfNotPresent
+
+# Credentials (overridden by Terraform set/set_sensitive)
+rootUser: minio
+rootPassword: minio123
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: "local-path"
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+
+service:
+  type: ClusterIP
+  port: 9000
+
+consoleService:
+  type: ClusterIP
+  port: 9001
+
+replicas: 1
+
+# Pre-create buckets via post-install job
+buckets:
+  - name: mlflow-artifacts
+    policy: none
+    purge: false
+  - name: kfp-artifacts
+    policy: none
+    purge: false
+  - name: datasets
+    policy: none
+    purge: false
+
+postJob:
+  podAnnotations: {}
+  securityContext:
+    enabled: false
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+
+metrics:
+  serviceMonitor:
+    enabled: false

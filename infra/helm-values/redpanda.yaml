@@ -1,0 +1,51 @@
+# Redpanda Helm values — redpanda/redpanda
+# Single-broker dev mode. NOT suitable for production (no replication durability).
+# For production: set statefulset.replicas=3, tls.enabled=true, auth.sasl.enabled=true.
+
+statefulset:
+  replicas: 1
+
+tls:
+  enabled: false
+
+auth:
+  sasl:
+    enabled: false
+
+storage:
+  persistentVolume:
+    enabled: true
+    size: 10Gi
+    storageClass: ""  # use cluster default (local-path on k3d)
+
+resources:
+  cpu:
+    cores: 1
+  memory:
+    # container.max must be >= redpanda.memory + redpanda.reserveMemory
+    container:
+      max: "1.5Gi"
+    redpanda:
+      memory: "1Gi"
+      reserveMemory: "256Mi"
+
+# Redpanda console (web UI for topic browsing)
+# Access via: kubectl port-forward svc/redpanda-console 8081:8080 -n platform
+console:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# No external exposure — internal ClusterIP only
+external:
+  enabled: false
+
+# Topic defaults applied at cluster level
+config:
+  cluster:
+    kafka_batch_max_bytes: 1048576
