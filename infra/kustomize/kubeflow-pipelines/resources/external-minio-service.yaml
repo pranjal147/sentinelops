@@ -1,0 +1,14 @@
+# DNS alias so KFP pods keep using host "minio-service:9000" while storing
+# artifacts in the Day 2 MinIO instance (platform namespace).
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: kubeflow
+spec:
+  type: ExternalName
+  externalName: minio.platform.svc.cluster.local
+  ports:
+    - name: http
+      port: 9000
+      protocol: TCP

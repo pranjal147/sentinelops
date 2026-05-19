@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-pipeline
+spec:
+  template:
+    spec:
+      containers:
+        - name: ml-pipeline-api-server
+          env:
+            # ExternalName services do not inject MINIO_SERVICE_SERVICE_HOST
+            # env vars via K8s service discovery. Set the host explicitly so
+            # ml-pipeline can reach platform MinIO via the ExternalName service.
+            - name: OBJECTSTORECONFIG_HOST
+              value: "minio-service.kubeflow.svc.cluster.local"
+            - name: OBJECTSTORECONFIG_PORT
+              value: "9000"

@@ -1,0 +1,29 @@
+# Lean Kubeflow Pipelines 2.3.0 for SentinelOps local dev.
+# - Uses platform MinIO (no bundled MinIO Deployment/PVC)
+# - Keeps bundled MySQL (KFP requires MySQL metadata DB, not Postgres)
+# - Namespace: kubeflow (required by upstream manifests)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kubeflow
+
+resources:
+  - https://github.com/kubeflow/pipelines/manifests/kustomize/base/installs/generic?ref=2.4.0
+  - https://github.com/kubeflow/pipelines/manifests/kustomize/base/metadata/base?ref=2.4.0
+  - https://github.com/kubeflow/pipelines/manifests/kustomize/third-party/argo/installs/namespace?ref=2.4.0
+  - https://github.com/kubeflow/pipelines/manifests/kustomize/third-party/mysql/base?ref=2.4.0
+  - resources/external-minio-service.yaml
+  - resources/minio-artifact-secret.yaml
+
+labels:
+  - includeSelectors: true
+    pairs:
+      application-crd-id: kubeflow-pipelines
+      project: sentinelops
+
+patches:
+  - path: patches/pipeline-install-config.yaml
+  - path: patches/ml-pipeline-minio-host.yaml
+  - path: patches/workflow-controller-configmap.yaml
+  - path: patches/workflow-controller-resources.yaml
+  - path: patches/mysql-resources.yaml

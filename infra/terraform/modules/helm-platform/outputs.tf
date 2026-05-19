@@ -33,14 +33,12 @@ output "namespaces" {
   value       = ["cert-manager", "platform", "mlops", "serving", "observability", "apps", "chaos-mesh"]
 }
 
-output "mlflow_endpoint" {
-  description = "MLflow tracking server endpoint (in-cluster)"
-  value       = "http://mlflow.mlops.svc.cluster.local:5000"
+output "kfp_namespace" {
+  description = "Namespace where Kubeflow Pipelines runs"
+  value       = var.enable_kfp ? "kubeflow" : ""
 }
 
-output "mlflow_ui_port_forward" {
-  description = "Command to access MLflow UI"
-  value       = "kubectl port-forward -n mlops svc/mlflow 5000:5000"
+output "kfp_ui_port_forward" {
+  description = "Command to open the KFP UI locally"
+  value       = "kubectl port-forward -n kubeflow svc/ml-pipeline-ui 8888:80"
 }
-
-# (mlflow outputs may already exist — these are idempotent)

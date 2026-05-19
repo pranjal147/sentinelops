@@ -48,11 +48,25 @@ variable "minio_chart_version" {
 variable "postgresql_chart_version" {
   description = "Bitnami PostgreSQL Helm chart version (OCI catalog)"
   type        = string
-  default     = "18.6.6"
+  default     = "16.0.0"
 }
 
 variable "redpanda_chart_version" {
   description = "Redpanda Helm chart version"
   type        = string
   default     = "5.9.14"
+}
+
+# ── Kubeflow Pipelines (Day 3) ────────────────────────────────────────────────
+
+variable "enable_kfp" {
+  description = "Install Kubeflow Pipelines standalone (platform-agnostic manifest)"
+  type        = bool
+  default     = true
+}
+
+variable "kfp_version" {
+  description = "Kubeflow Pipelines manifest ref (pinned)"
+  type        = string
+  default     = "2.4.0"
 }

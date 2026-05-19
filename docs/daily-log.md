@@ -77,48 +77,43 @@ X hours
 ### Blockers
 None / [list]
 
-### Tomorrow
-Day 3: MLflow + Kubeflow Pipelines (the hard day)
+## Day 3 — MLflow + Kubeflow Pipelines (2026-05-19)
 
----
+**Goal:** MLflow + Kubeflow Pipelines standalone v2.4.0 installed and verified.
 
-## Day 3 — Task 1: MLflow (2026-05-17)
+### Task 1 — MLflow (completed in prior session)
+- [x] Plain K8s Deployment (burakince/mlflow:2.1.1)
+- [x] Verified: GET /health → 200, /version → 2.1.1
 
-**Goal:** MLflow tracking server + model registry running, backed by Postgres + MinIO.
+### Task 2 — Kubeflow Pipelines Standalone v2.4.0
+- [x] Upgraded from 2.3.0 → 2.4.0 (gcr.io shutdown March 2025 killed all 2.3.0 images)
+- [x] Lean kustomize overlay (infra/kustomize/kubeflow-pipelines/) — no bundled MinIO
+- [x] Platform MinIO routed via ExternalName service (minio-service → minio.platform.svc.cluster.local)
+- [x] All 13 KFP deployments Available
+- [x] Tutorial pipeline `[Tutorial] Data passing in python components` — **Succeeded**
+- [x] KFP UI accessible at http://localhost:8888
+- [x] Cluster RAM after KFP: ~3.8 GB (target <8 GB)
 
-### Completed
-- [x] MLflow 2.1.1 running via plain K8s Deployment (NOT Helm chart)
-- [x] Backed by PostgreSQL (mlflow database in platform namespace)
-- [x] Artifacts on MinIO (s3://mlflow-artifacts) via S3 protocol
-- [x] Health endpoint returns OK
-- [x] Default experiment auto-created with correct S3 artifact location
-- [x] Pod Ready 1/1, RESTARTS 0
+### Hard-won fixes (Day 3 lessons)
+1. **gcr.io shutdown (March 2025)** — KFP 2.3.0 images all deleted. Upgraded to 2.4.0 (ghcr.io).
+2. **platform-agnostic bundled MinIO** — `gcr.io/ml-pipeline/minio:RELEASE.2019-08-14T20-37-41Z` deleted. Used lean kustomize overlay that routes to platform MinIO via ExternalName.
+3. **OBJECTSTORECONFIG_HOST missing** — ExternalName services don't inject K8s env vars. Patched ml-pipeline deployment with explicit `OBJECTSTORECONFIG_HOST=minio-service.kubeflow.svc.cluster.local`.
+4. **argoexec init container** — `gcr.io/ml-pipeline/argoexec:v3.4.17-license-compliance` deleted. Loaded `quay.io/argoproj/argoexec:v3.4.17` into k3d nodes via `docker cp + ctr images import` after clearing corrupt partial imports. Also patched workflow-controller-configmap executor image.
+5. **Terraform depends_on** — `make kfp-apply` triggered postgresql Helm upgrade (timeout). Switched kfp-apply to use `install-kfp.sh` directly (kubectl apply, no Terraform).
+6. **Windows/WSL2 split** — Cursor edits Windows path; kubectl runs in WSL2 ~/sentinelops. Sync via `cp /mnt/c/...` pattern. Added .claude/ to .gitignore.
+7. **Docker Desktop hung** — k3d image import and docker exec hung for 3+ hours. Fix: kill all docker processes via Task Manager + wsl --shutdown + laptop restart.
+
+### Makefile targets added
+- `make kfp-apply` — kubectl-based install (no Terraform)
+- `make kfp-down` / `kfp-up` — scale KFP to 0/1
+- `make kfp-status` — show pods + RAM
+- `make port-forward-kfp` — port-forward UI to 8888
 
 ### Time spent
-~5 hours (mostly debugging chart incompatibilities)
+~10 hours (majority on gcr.io image debugging)
 
-### Journey: 4 incompatibilities navigated
-1. **community-charts/mlflow chart 1.8.1 + MLflow 3.7**: chart values silently dropped
-   non-listed env vars (MLFLOW_HOST, MLFLOW_ALLOWED_HOSTS got filtered out)
-2. **MLflow 3.7 security middleware**: rejects non-localhost requests by default,
-   killed K8s readiness probes
-3. **--gunicorn-opts incompatible with --disable-security-middleware**: MLflow 3.7
-   refused to start with both passed
-4. **MLflow 3.7 init container migrated DB schema, then MLflow 2.1.1 refused
-   to run against the newer schema** — needed to drop+recreate the mlflow database
+### Cluster RAM after KFP
+~3.8 GB total (target <8 GB) ✅
 
-### Resolution
-- Switched from Helm chart to plain Kubernetes Deployment manifest
-  (infra/manifests/mlflow/deployment.yaml + Terraform null_resource to apply it)
-- Pinned MLflow 2.1.1 (burakince/mlflow:2.1.1 — bundles psycopg2 + boto3)
-- No security middleware in 2.1.1 = no probe issues
-- Manifest under direct control means future debugging is straightforward
-
-### Tradeoffs (documented for production migration later)
-- Plain manifest vs chart: simpler, easier to debug, but no chart versioning niceties
-- MLflow 2.x vs 3.x: 2.x is missing some 3.x features (auth, security middleware)
-  but functionally identical for our tracking + registry use case
-- For production: move to MLflow 3.x with uvicorn (not gunicorn) + Istio mTLS
-
-### Cluster RAM at end of task
-~5GB across 3 nodes
+### Tomorrow
+Day 4: First ML pipeline — LightGBM fraud detection

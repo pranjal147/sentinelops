@@ -57,6 +57,7 @@ resource "helm_release" "cert_manager" {
 
 # ── MinIO ──────────────────────────────────────────────────────────────────────
 # S3-compatible object store for model artifacts, datasets, and pipeline outputs.
+# Uses the official MinIO chart (charts.min.io) — NOT Bitnami.
 # ⚠ DEV ONLY: credentials are intentionally simple — change before any exposure.
 
 resource "helm_release" "minio" {
@@ -88,6 +89,11 @@ resource "helm_release" "minio" {
 # ── PostgreSQL ─────────────────────────────────────────────────────────────────
 # Metadata store for MLflow experiments and Kubeflow Pipeline metadata.
 # Three databases created via initdb script on first PVC initialisation.
+#
+# Chart: OCI Bitnami catalog (still works for the CHART itself).
+# Image: bitnamilegacy/postgresql (Bitnami moved versioned images here in 2025).
+# See: https://github.com/bitnami/charts/issues/35164
+#
 # ⚠ DEV ONLY: password in variables.tf default — use TF_VAR_postgres_password in CI.
 
 resource "helm_release" "postgresql" {
@@ -125,7 +131,6 @@ resource "helm_release" "redpanda" {
 
   values = [file("${local.values_dir}/redpanda.yaml")]
 
-  # Redpanda takes longer to start than typical Helm charts
   wait          = true
   wait_for_jobs = false
   timeout       = 600
@@ -173,48 +178,17 @@ resource "null_resource" "redpanda_topics" {
   depends_on = [helm_release.redpanda]
 }
 
-# ── MLflow ─────────────────────────────────────────────────────────────────────
-# Experiment tracking + model registry. Backed by Postgres (mlflow database)
-# and MinIO (mlflow-artifacts bucket via S3 protocol).
-# Runs in mlops namespace. UI port-forward: kubectl port-forward -n mlops svc/mlflow 5000:5000
+# ── Kubeflow Pipelines (standalone 2.3.0) ─────────────────────────────────────
+# Uses upstream platform-agnostic manifest (bundled MySQL + MinIO inside kubeflow).
+# Does NOT modify platform/* or mlops/* — separate namespace only.
+# See docs/CLAUDE_CODE_HANDOFF.md
 
+resource "null_resource" "kfp_crds" {
+  count = var.enable_kfp ? 1 : 0
 
-# ── MLflow (plain Deployment) ──────────────────────────────────────────────────
-# Bypasses the community-charts/mlflow Helm chart due to MLflow 3.7 incompat.
-# Pinned to MLflow 2.18.0 (via burakince/mlflow:2.18.0).
-# Backed by Postgres (database 'mlflow') + MinIO bucket 'mlflow-artifacts'.
-
-resource "kubernetes_secret" "mlflow" {
-  metadata {
-    name      = "mlflow-secrets"
-    namespace = kubernetes_namespace.platform_namespaces["mlops"].metadata[0].name
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
-      "project"                      = "sentinelops"
-    }
-  }
-
-  data = {
-    "backend-store-uri"     = "postgresql://postgres:${var.postgres_password}@postgresql.platform.svc.cluster.local:5432/mlflow"
-    "aws-access-key-id"     = var.minio_root_user
-    "aws-secret-access-key" = var.minio_root_password
-  }
-
-  type = "Opaque"
-
-  depends_on = [
-    kubernetes_namespace.platform_namespaces,
-    helm_release.postgresql,
-    helm_release.minio,
-  ]
-}
-
-resource "null_resource" "mlflow_deployment" {
   triggers = {
-    # Re-apply when the manifest file changes
-    manifest_sha = filesha256("${path.module}/../../../manifests/mlflow/deployment.yaml")
-    # Re-apply if the secret changes (so the deployment picks up rotated creds)
-    secret_uid = kubernetes_secret.mlflow.metadata[0].uid
+    kfp_version = var.kfp_version
+    kubeconfig  = local.kubeconfig
   }
 
   provisioner "local-exec" {
@@ -222,21 +196,71 @@ resource "null_resource" "mlflow_deployment" {
     command     = <<-EOT
       set -euo pipefail
       export KUBECONFIG="${local.kubeconfig}"
-      echo "Applying MLflow deployment manifest..."
-      kubectl apply -f ${path.module}/../../../manifests/mlflow/deployment.yaml
-      echo "Waiting for MLflow deployment to be Ready (up to 5 min)..."
-      kubectl wait --for=condition=Available --timeout=300s \
-        deployment/mlflow -n mlops
-      echo "MLflow Ready."
+      kubectl apply -k "github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref=${var.kfp_version}"
+      kubectl wait --for=condition=Established --timeout=120s \
+        crd/applications.app.k8s.io \
+        crd/scheduledworkflows.kubeflow.org \
+        crd/viewers.kubeflow.org \
+        crd/workflows.argoproj.io \
+        crd/workflowtemplates.argoproj.io \
+        crd/cronworkflows.argoproj.io
     EOT
   }
 
   provisioner "local-exec" {
-    when    = destroy
-    command = "kubectl delete -f ${path.module}/../../../manifests/mlflow/deployment.yaml --ignore-not-found=true"
+    when        = destroy
+    interpreter = ["bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      export KUBECONFIG="${self.triggers.kubeconfig}"
+      kubectl delete -k "github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref=${self.triggers.kfp_version}" \
+        --ignore-not-found --wait=false || true
+    EOT
   }
 
   depends_on = [
-    kubernetes_secret.mlflow,
+    helm_release.minio,
+    helm_release.postgresql,
+    helm_release.cert_manager,
   ]
+}
+
+resource "null_resource" "kfp_platform" {
+  count = var.enable_kfp ? 1 : 0
+
+  triggers = {
+    kfp_version   = var.kfp_version
+    crd_id        = null_resource.kfp_crds[0].id
+    kubeconfig    = local.kubeconfig
+    kustomize_dir = "${path.module}/../../../kustomize/kubeflow-pipelines"
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-c"]
+    # Use the lean kustomize overlay (infra/kustomize/kubeflow-pipelines/) instead of
+    # platform-agnostic. This avoids the bundled MinIO deployment whose image
+    # (gcr.io/ml-pipeline/minio:RELEASE.2019-08-14T20-37-41Z-license-compliance) was
+    # purged when gcr.io shut down in March 2025. The overlay routes KFP artifact
+    # storage to the Day 2 platform MinIO via an ExternalName service.
+    command = <<-EOT
+      set -euo pipefail
+      export KUBECONFIG="${local.kubeconfig}"
+      kubectl apply -k "${path.module}/../../../kustomize/kubeflow-pipelines"
+      bash "${path.module}/../../../../scripts/kfp-wait-deployments.sh"
+    EOT
+  }
+
+  provisioner "local-exec" {
+    when        = destroy
+    interpreter = ["bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      export KUBECONFIG="${self.triggers.kubeconfig}"
+      kubectl delete -k "${self.triggers.kustomize_dir}" \
+        --ignore-not-found --wait=false || true
+      kubectl delete namespace kubeflow --ignore-not-found --wait=true --timeout=300s || true
+    EOT
+  }
+
+  depends_on = [null_resource.kfp_crds]
 }

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pipeline-install-config
+data:
+  # Store pipeline artifacts in the pre-created Day 2 bucket
+  bucketName: kfp-artifacts
+  defaultPipelineRoot: minio://kfp-artifacts/v2/artifacts
