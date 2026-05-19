@@ -86,6 +86,14 @@ port-forward-foundation: ## Port-forward MinIO, Postgres, Redpanda console to lo
 upload-fraud-dataset: ## Download Kaggle fraud dataset and upload to MinIO
 	@KUBECONFIG=$(KUBECONFIG_LOCAL) bash scripts/upload-fraud-dataset.sh
 
+# ===== IMAGE PRELOADING (run after every Docker Desktop restart) ================
+
+.PHONY: preload-images
+preload-images: ## Preload gcr.io/bitnami images into k3d nodes (run after Docker Desktop restart)
+	@echo "▶ Preloading images into k3d cluster (3-5 min first run, ~1 min cached)…"
+	@KUBECONFIG=$(KUBECONFIG_LOCAL) bash scripts/preload-images.sh
+	@echo "✅ Images preloaded. Cluster ready for use."
+
 # ===== KUBEFLOW PIPELINES (DAY 3) ============================================
 # Installs via Terraform null_resource (platform-agnostic 2.3.0).
 # Does NOT touch platform/* or mlops/mlflow.
