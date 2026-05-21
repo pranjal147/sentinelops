@@ -2,10 +2,10 @@
 # Repo: https://charts.min.io/
 # Chart version: 5.4.0
 # App version: RELEASE.2024-12-18T13-15-44Z
-# NOT Bitnami — different schema!
 
 mode: standalone
 
+# Pinned image versions (matching the chart's defaults but explicit for reproducibility)
 image:
   repository: quay.io/minio/minio
   tag: RELEASE.2024-12-18T13-15-44Z
@@ -20,16 +20,19 @@ mcImage:
 rootUser: minio
 rootPassword: minio123
 
+# Storage
 persistence:
   enabled: true
   size: 10Gi
   storageClass: "local-path"
 
+# Resources
 resources:
   requests:
     memory: 256Mi
     cpu: 100m
 
+# Service ports
 service:
   type: ClusterIP
   port: 9000
@@ -38,6 +41,7 @@ consoleService:
   type: ClusterIP
   port: 9001
 
+# Single replica for dev
 replicas: 1
 
 # Pre-create buckets via post-install job
@@ -52,6 +56,7 @@ buckets:
     policy: none
     purge: false
 
+# Post-install job to create buckets — minimal config
 postJob:
   podAnnotations: {}
   securityContext:
@@ -61,6 +66,7 @@ postJob:
       memory: 128Mi
       cpu: 50m
 
+# Disable serviceMonitor for now (we'll enable on Day 8 when Prometheus arrives)
 metrics:
   serviceMonitor:
     enabled: false

@@ -1,13 +1,24 @@
-# PostgreSQL Helm values — bitnami/postgresql
+# PostgreSQL Helm values — bitnami/postgresql via OCI catalog
+# Image overridden to bitnamilegacy/postgresql since Bitnami moved versioned
+# images out of docker.io/bitnami in 2025.
+# See: https://github.com/bitnami/charts/issues/35164
+#
 # ⚠ DEV ONLY: password is overridden via Terraform set_sensitive block.
-# ⚠ KNOWN ISSUE: Currently running on bitnami/postgresql:latest (rolling tag).
-#    Bitnami announced deprecation of free tags in Aug 2025. Plan to migrate
-#    to bitnamilegacy/postgresql:16.4.0-debian-12-r10 on Day 3 (clean install).
 
 architecture: standalone
 
+# CRITICAL: Override the image to use the legacy registry.
+# Without this, image pull will fail just like the MinIO Bitnami issue.
+image:
+  registry: docker.io
+  repository: bitnamilegacy/postgresql
+  tag: 16.4.0-debian-12-r10
+  pullPolicy: IfNotPresent
+
 auth:
+  # Placeholder — overridden by Terraform set_sensitive
   postgresPassword: changeme
+  # Disable separate app user — services connect as postgres superuser for simplicity
   username: ""
   password: ""
   database: ""
@@ -16,8 +27,11 @@ primary:
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: ""  # use cluster default (local-path on k3d)
+    storageClass: "" # use cluster default (local-path on k3d)
 
+  # initdb scripts run ONCE on fresh PVC initialisation.
+  # They will NOT re-run if the PVC already contains data.
+  # To re-run: delete the PVC then re-apply.
   initdb:
     scripts:
       01_create_databases.sql: |
@@ -32,6 +46,11 @@ primary:
     limits:
       cpu: 500m
       memory: 512Mi
+
+# Disable the Bitnami "test" image and any other sub-components that
+# might also try to pull from bitnami/* repos.
+volumePermissions:
+  enabled: false
 
 # Access via port-forward:
 # kubectl port-forward svc/postgresql 5432:5432 -n platform

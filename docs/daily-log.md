@@ -117,3 +117,38 @@ None / [list]
 
 ### Tomorrow
 Day 4: First ML pipeline — LightGBM fraud detection
+
+---
+
+## Day 4 — LightGBM Fraud Detection Pipeline (2026-05-21)
+
+**Goal:** End-to-end KFP pipeline: load → validate → preprocess → train → evaluate. MLflow logging. AUC quality gate.
+
+### Completed
+- [x] `pipelines/fraud-lgbm/` scaffold: Dockerfile, requirements.txt, 5 components, pipeline.py
+- [x] Component base image built and pushed to k3d registry (`fraud-component:v4`)
+- [x] Pipeline compiled to `pipeline.yaml` (KFP DSL v2, kfp==2.5.0)
+- [x] All 5 steps run successfully in KFP: load_data → validate_data → preprocess → train → evaluate
+- [x] LightGBM trains with `scale_pos_weight` for class imbalance; AUC = 0.8984
+- [x] MLflow run logged (params, train_auc, model artifact)
+- [x] Quality gate enforced in evaluate step (threshold 0.88)
+
+### Hard-won fixes (Day 4 lessons)
+1. **k3d registry hostname** — Pods must use `k3d-registry.localhost:5000` not `localhost:5000`. Mirror only configured for the former.
+2. **libgomp.so.1 missing** — `python:3.11-slim` lacks OpenMP. Fix: multi-stage Dockerfile copies `libgomp.so.1` from `python:3.11` full image. No apt-get needed.
+3. **Docker build cache corruption** — Cancelled builds left corrupted cached layers. Fix: `docker build --no-cache`.
+4. **ctr images import hangs** — Importing >500MB images into k3d nodes via `ctr` hangs Docker Desktop. Let registry pull happen naturally instead.
+5. **pipeline.yaml references stale image tag** — Always verify with `grep fraud-component pipeline.yaml` before submitting.
+6. **Docker credential helper** — `docker-credential-desktop.exe` not in WSL2 PATH after restart. Fix: remove `credsStore`/`credHelpers` from `~/.docker/config.json`.
+
+### Makefile targets added
+- `make preload-images` — preload critical images into k3d nodes after restart
+
+### Time spent
+~8 hours (majority on Docker Desktop instability + image build/push issues)
+
+### Cluster RAM
+~4.2 GB total ✅
+
+### Tomorrow
+Day 5: KServe model serving + Istio ingress

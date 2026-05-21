@@ -51,8 +51,31 @@ start_pf() {
   fi
 }
 
-start_pf "minio-api"      "platform" "minio"            9000  9000
-start_pf "minio-console"  "platform" "minio"            9001  9001
+start_pf "minio-api"      "platform" "minio"            9000 9000
+
+# Bitnami splits Console into its own ClusterIP Service (HTTP service port defaults to 9090)
+MINIO_CONSOLE_SVC=""
+MINIO_CONSOLE_SVC="$(kubectl --kubeconfig="${KUBECONFIG}" get svc -n platform --no-headers 2>/dev/null \
+  | awk '{print $1}' \
+  | grep -vi redpanda \
+  | grep -iE '^minio.*console|^minio-console|^.*-minio-console$' \
+  | head -1)"
+if [[ -z "${MINIO_CONSOLE_SVC}" ]]; then
+  MINIO_CONSOLE_SVC="$(kubectl --kubeconfig="${KUBECONFIG}" get svc -n platform --no-headers 2>/dev/null \
+    | awk '{print $1}' \
+    | grep -vi redpanda \
+    | grep -i console \
+    | head -1)"
+fi
+if [[ -n "${MINIO_CONSOLE_SVC}" ]]; then
+  # Official charts.min.io chart: console Service port 9001
+  # Bitnami chart: console Service port 9090 (container HTTP)
+  CONSOLE_REMOTE=$(kubectl --kubeconfig="${KUBECONFIG}" get svc "${MINIO_CONSOLE_SVC}" -n platform \
+    -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || echo "9001")
+  start_pf "minio-console" "platform" "${MINIO_CONSOLE_SVC}" 9001 "${CONSOLE_REMOTE}"
+else
+  echo -e "  ${YELLOW}⚠ ${RESET}  minio-console: no console Service yet (still deploying?)"
+fi
 start_pf "postgres"       "platform" "postgresql"       5432  5432
 start_pf "redpanda-kafka" "platform" "redpanda"         9092  9092
 start_pf "redpanda-ui"    "platform" "redpanda-console" 8081  8080
