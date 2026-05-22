@@ -112,3 +112,9 @@ kubectl get pods -n kubeflow | grep -v "Running\|Completed"
 kubectl port-forward -n kubeflow svc/ml-pipeline-ui 8888:80 &
 kubectl port-forward -n mlops svc/mlflow 5000:5000 &
 ```
+
+### L11 — gcr.io/kubebuilder/kube-rbac-proxy is dead
+**Symptom:** KServe controller ImagePullBackOff for gcr.io/kubebuilder/kube-rbac-proxy:v0.13.1
+**Fix:** Patch deployment to use upstream image:
+kubectl patch deployment kserve-controller-manager -n kserve --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/1/image","value":"quay.io/brancz/kube-rbac-proxy:v0.13.1"}]'
+**Rule:** Any gcr.io/kubebuilder/* image -> replace with quay.io/brancz/*.
