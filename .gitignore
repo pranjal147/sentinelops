@@ -183,3 +183,15 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+# Claude Code worktrees (never commit)
+.claude/
+
+# ── Secrets (NEVER commit) ────────────────────────────────────────────────────
+.env
+.env.*
+*secret*.yaml
+*secret*.json
+*credentials*
+anthropic_key*
+sk-ant-*
