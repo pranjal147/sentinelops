@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prediction-logger
+  namespace: serving
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prediction-logger
+  template:
+    metadata:
+      labels:
+        app: prediction-logger
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: prediction-logger
+          image: k3d-registry.localhost:5000/prediction-logger:v1
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PREDICTOR_URL
+              value: "http://fraud-lgbm-predictor.serving.svc.cluster.local/v1/models/fraud-lgbm:predict"
+            - name: KAFKA_BROKERS
+              value: "redpanda.platform.svc.cluster.local:9092"
+            - name: KAFKA_TOPIC
+              value: "predictions"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prediction-logger
+  namespace: serving
+spec:
+  selector:
+    app: prediction-logger
+  ports:
+    - port: 8000
+      targetPort: 8000
