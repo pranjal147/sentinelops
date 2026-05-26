@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anomaly-detector
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: anomaly-detector
+  template:
+    metadata:
+      labels:
+        app: anomaly-detector
+    spec:
+      containers:
+        - name: anomaly-detector
+          image: k3d-registry.localhost:5000/anomaly-detector:v1
+          env:
+            - name: KAFKA_BROKERS
+              value: "redpanda-0.redpanda.platform.svc.cluster.local:9093"
+            - name: INPUT_TOPIC
+              value: "predictions"
+            - name: OUTPUT_TOPIC
+              value: "anomalies"
+            - name: LATENCY_THRESHOLD_MS
+              value: "500"
+            - name: SPIKE_THRESHOLD
+              value: "0.3"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
